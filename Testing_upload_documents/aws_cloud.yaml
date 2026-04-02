@@ -1,0 +1,70 @@
+set_user_field: username #Options: username, strip_email, custom
+
+password_mapping:
+  first_name:
+    count: 4
+    capitalize_count: 1
+  employee_id: full
+  character: "@"
+  number: 145
+
+delete_type: soft_delete
+
+region_name: "us-east-2"
+
+
+ic_field_mappings:
+  Title: job_title
+  UserType: user_type
+  NickName: first_name
+  Roles: roles
+  Timezone: timezone
+  Locale: locale
+  Name.GivenName: first_name
+  Name.FamilyName: last_name
+  PhoneNumbers: mobile_phone
+  Address.StreetAddress: street_address
+  Address.Locality: city
+  Address.Region: state
+  Address.PostalCode: postal_code
+  Address.Country: country
+  Enterprise.EmployeeNumber: employee_id
+  Enterprise.CostCenter: cost_center
+  Enterprise.Organization: organization
+  Enterprise.Division: division
+  Enterprise.Department: department_name
+  Enterprise.Manager: manager_user_id
+
+
+
+
+# custom_username:
+#     first_field: first_name
+#     second_field: last_name
+#     firstfield_length: 1
+#     secondfield_length: -1
+#     separator: "."
+#     case_type: lower
+
+# Optional: Password change policy ARN (AWS managed by default)
+# password_change_policy: arn:aws:iam::aws:policy/IAMUserChangePassword
+
+# Waiter configuration for eventual consistency
+# waiter_delay: 2
+# waiter_max_attempts: 20
+
+# Field Mappings (Optional - overrides defaults)
+# Maps Identity Field -> Target Field
+
+# IAM Tags Mapping
+# Format: TagKey: identity_field
+# iam_field_mappings:
+#   EmployeeId: employee_id
+#   Department: department_name
+#   Email: primary_email
+#   CostCenter: cost_center
+# Format: AttributePath: identity_field
+# Supports dot notation for nested fields (Name.GivenName)
+
+
+

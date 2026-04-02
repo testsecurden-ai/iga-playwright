@@ -1,0 +1,202 @@
+queries:
+  user_roles: |
+    SELECT
+      HRM_EMP_ID.EmployeeID,
+      HRM_EMP_ID.EmpCode,
+      HRM_EMP_ID.SecondaryEmpFirtName AS FirstNameInEng,
+      HRM_EMP_ID.SecondaryEmpFatherName AS FatherNameinEng,
+      HRM_EMP_ID.SecondaryEmpGrandFatherName AS GrandFatherNameEnglish,
+      HRM_EMP_ID.DivisionID,
+      HRM_EMP_ID.SecondaryEmpLastName AS FamilyNameEnglish,
+      HRM_EMP_ID.EmpGender,
+      HRM_EMP_ID.JobID AS JobTitleId,
+      HRM_ADMIN_JOB_STRUCTURE.SecondaryName AS JobTitleEnglish,
+      HRM_EMP_ID.JobTypeID AS EmployementType,
+      HRM_ADMIN_COMPANY_LOCATIONS.SecondaryName AS BranchEnglish,
+      HRM_EMP_ADDRESS_WORK.WorkEmail,
+      HRM_EMP_ID.EmploymentDate,
+      HRM_EMP_ID.PermanentDate,
+      HRM_EMP_ID.Status AS EmploymentStatus,
+      HRM_EMP_ID.ResignationDate,
+      HRM_EMP_ID.TerminationDate AS LastWorkingDate,
+      HRM_EMP_ID.SuspendedDate,
+      HRM_EMP_PERSONAL.MaritalStatus,
+      HRM_EMP_PERSONAL.DateOFBirth AS BirthDate,
+      HRM_EMP_ID.SecondaryFullName AS FullNameEng,
+      manager.EmployeeID AS SupervisorEmpid,
+      manager.EmpCode AS Supervisorempcode,
+      manager.SecondaryFullName AS SupervisorName,
+      HRM_EMP_ADDRESS_WORK.Mobile AS PrimaryContactPhone,
+      HRM_ADMIN_COMPANY_GENERAL.SecondaryDescription AS Company,
+      HRM_EMP_PERSONAL.NationalIdNo AS NationalID,
+      HRM_ADMIN_COMPANY_NATIONALITY.SecondaryName AS NationalityCountryRegion,
+      HRM_COUNTRY.SecondaryDescription AS Country,
+      CASE
+        WHEN HRM_ADMIN_COMPANY_STRUCTURE.SecondaryTitle IS NULL
+          OR HRM_ADMIN_COMPANY_STRUCTURE.SecondaryTitle = ''
+        THEN HRM_ADMIN_COMPANY_STRUCTURE.Title
+        ELSE HRM_ADMIN_COMPANY_STRUCTURE.SecondaryTitle
+      END AS costCenter
+    FROM HRM_EMP_ID
+      INNER JOIN HRM_ADMIN_JOB_STRUCTURE
+        ON HRM_ADMIN_JOB_STRUCTURE.ID = HRM_EMP_ID.JobID
+      INNER JOIN HRM_ADMIN_COMPANY_LOCATIONS
+        ON HRM_ADMIN_COMPANY_LOCATIONS.ID = HRM_EMP_ID.BranchID
+      LEFT JOIN HRM_EMP_ADDRESS_WORK
+        ON HRM_EMP_ADDRESS_WORK.EmployeeID = HRM_EMP_ID.EmployeeID
+      INNER JOIN HRM_EMP_PERSONAL
+        ON HRM_EMP_PERSONAL.EmployeeID = HRM_EMP_ID.EmployeeID
+      LEFT OUTER JOIN HRM_EMP_ID manager
+        ON manager.EmployeeID = HRM_EMP_ID.ManagerID
+      INNER JOIN HRM_ADMIN_COMPANY_GENERAL
+        ON HRM_EMP_ID.CompanyID = HRM_ADMIN_COMPANY_GENERAL.CompanyID
+      LEFT OUTER JOIN HRM_ADMIN_COMPANY_NATIONALITY
+        ON HRM_ADMIN_COMPANY_NATIONALITY.ID = HRM_EMP_PERSONAL.CitizenShip
+      LEFT OUTER JOIN HRM_EMP_ADDRESS_RESIDENT
+        ON HRM_EMP_ADDRESS_RESIDENT.EmployeeID = HRM_EMP_ID.EmployeeID
+      LEFT OUTER JOIN HRM_COUNTRY
+        ON HRM_COUNTRY.CountryID = HRM_EMP_ADDRESS_RESIDENT.CountryID
+      INNER JOIN HRM_ADMIN_COMPANY_STRUCTURE
+        ON HRM_ADMIN_COMPANY_STRUCTURE.ID = HRM_EMP_ID.DivisionID
+    ORDER BY HRM_EMP_ID.EmployeeID
+    OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+
+  permissions: |
+    SELECT
+      p.PermissionID as id,
+      p.PermissionName as name,
+      p.Resource as resource,
+      p.Action as action,
+      p.Description as description
+    FROM Permissions p
+    WHERE p.IsActive = 1
+
+  department: |
+    SELECT
+      ID AS DepartmentID,
+      Title,
+      SecondaryTitle,
+      EmployeeID AS DepartmentManagerID
+    FROM HRM_ADMIN_COMPANY_STRUCTURE
+    ORDER BY ID
+
+  user_count: |
+    SELECT COUNT(*)
+    FROM HRM_EMP_ID
+
+  location: |
+    SELECT
+      SecondaryName as name,
+      code
+    FROM HRM_ADMIN_COMPANY_LOCATIONS
+
+mappings:
+  user_mapping:
+    external_id:
+      source: EmployeeID
+      transforms:
+        - to_str
+        - strip
+    employee_id: EmpCode
+    office: EmpCode
+    primary_email: WorkEmail
+    first_name: FirstNameInEng
+    last_name: FamilyNameEnglish
+    work_phone: PhoneNumber
+    mobile_phone: PrimaryContactPhone
+    hire_date: EmploymentDate
+    termination_date: ResignationDate
+    last_working_day: LastWorkingDate
+    username:
+      source: WorkEmail
+      transforms:
+        - substring_before: "@"
+        - lower
+      dynamic_source:
+        sources: [FirstNameInEng, FamilyNameEnglish]
+        transforms:
+          - concat:
+              fields: [FirstNameInEng, FamilyNameEnglish]
+              sep: "."
+          - lower
+    display_name:
+      concat: [FirstNameInEng, FamilyNameEnglish]
+      separator: ' '
+    department: costCenter
+    job_title: JobTitleEnglish
+    employment_type:
+      source: EmployementType
+      transforms:
+        - lookup:
+          1: "Employee Saudi 35 Day Vacation"
+          2: "Employee Saudi 30 Day Vacation"
+          3: "Employee Non-Saudi 30 Day Vacation"
+          4: "Employee Non-Saudi 35 Day Vacation"
+          5: "Employee Saudi 30 Day Vacation - New GOSI"
+        - to_str
+        - strip
+    employment_status:
+      source: "EmploymentStatus"
+      transforms:
+        - lookup:
+          1: "ACTIVE"
+          2: "SUSPENDED"
+          3: "INACTIVE"
+          4: "NOTICE_PERIOD"
+    manager_external_id:
+      source: SupervisorEmpid
+      transforms:
+        - to_str
+        - strip
+    reports_to_name: SupervisorName
+    location:
+      source: BranchEnglish
+      default: "Chennai"
+
+  department_mapping:
+    name: SecondaryTitle
+    description:
+      source: description
+      default: "Added through IGA"
+    industry:
+      source: industry
+      default: "common"
+
+  role_mapping:
+    user_id: user_id
+    role_id: role_id
+    role_name: role_name
+    description: role_description
+    assigned_date: assigned_date
+    is_active: is_active
+
+  permission_mapping:
+    id: id
+    name: name
+    resource: resource
+    action: action
+    description: description
+
+  location_iso_mapping:
+      name: name
+      code:
+        source: code
+        transforms:
+          - to_str
+          - strip
+          - lookup:
+            India : "IN"
+
+
+
+
+transformations:
+  date_formats:
+    - "%Y-%m-%d %H:%M:%S"
+    - "%Y-%m-%d"
+
+  boolean_fields:
+    - is_active
+    - is_deleted
+
+pk_field: 'employee_id'

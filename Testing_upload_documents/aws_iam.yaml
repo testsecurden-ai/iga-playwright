@@ -1,0 +1,43 @@
+
+set_user_field: username #Options: username, strip_email, custom
+
+
+password_mapping:
+  first_name:
+    count: 4
+    capitalize_count: 1
+  employee_id: full
+  character: "@"
+  number: 145
+
+delete_type: soft_delete
+
+policy_scope: "All" #policy_scope: 'All', 'AWS', or 'Local'
+
+
+# custom_username:
+#     first_field: first_name
+#     second_field: last_name
+#     firstfield_length: 1
+#     secondfield_length: -1
+#     separator: "."
+#     case_type: lower
+
+
+# password_change_policy: arn:aws:iam::aws:policy/IAMUserChangePassword
+
+# Waiter configuration for eventual consistency
+# waiter_delay: 2
+# waiter_max_attempts: 20
+
+
+# Field Mappings (Optional - overrides defaults)
+# Maps Identity Field -> Target Field
+
+# IAM Tags Mapping
+# Format: TagKey: identity_field
+# iam_field_mappings:
+#   EmployeeId: employee_id
+#   Department: department_name
+#   Email: primary_email
+#   CostCenter: cost_center

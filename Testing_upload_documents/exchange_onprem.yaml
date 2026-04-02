@@ -1,0 +1,29 @@
+search_user_field:
+    db_field : office
+    search_field: physicalDeliveryOfficeName
+
+alternate_search_field:
+    db_field : display_name
+    search_field: displayName
+
+set_user_field: username
+
+# base_dn: "DC=Alyusr,DC=com"
+    
+custom_username:
+  first_field: "first_name"
+  second_field: "middle_name"
+  third_field: "last_name"
+  firstfield_length: 1
+  secondfield_length: 0
+  thirdfield_length: -1
+  separator: ""
+  case_type: "lower"
+
+password_mapping:
+  username : 
+      count: 4
+      capitalize_count : 1
+  employee_id : full
+  character: '@'
+  number: 145

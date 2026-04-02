@@ -1,0 +1,84 @@
+ad_base_fields:
+  - username
+  - primary_email
+  - display_name
+  - employee_id
+  - first_name
+  - last_name
+  - division
+  - office
+  - work_phone
+  - mobile_phone
+
+ad_field_mappings :
+     cn: username
+     userPrincipalName: primary_email
+     displayName: display_name
+     employeeID: employee_id
+     givenName: first_name
+     sn: last_name
+     mail: primary_email
+     division: division
+     department: department_name
+     title: job_title_name
+     manager: manager_username
+     company: location_name
+     physicalDeliveryOfficeName: office
+     telephoneNumber: work_phone
+     mobile: mobile_phone
+     co: location_country
+     streetAddress: location_address_line
+
+ad_value_mappings:
+    username : cn
+    primary_email: userPrincipalName
+    display_name: displayName
+    employee_id: employeeID
+    first_name: givenName
+    last_name: sn
+    division: division
+    department_name: department
+    job_title_name: title
+    manager_username: manager
+    location_name: company
+    office: physicalDeliveryOfficeName
+    work_phone: telephoneNumber
+    mobile_phone: mobile
+    location_country: co
+    location_address_line: streetAddress
+
+search_user_field:
+    db_field : office
+    search_field: physicalDeliveryOfficeName
+
+alternate_search_field:
+    db_field : display_name
+    search_field: displayName
+
+set_user_field: username
+    
+custom_username:
+  first_field: "first_name"
+  second_field: "middle_name"
+  third_field: "last_name"
+  firstfield_length: 1
+  secondfield_length: 0
+  thirdfield_length: -1
+  separator: ""
+  case_type: "lower"
+
+password_mapping:
+  username : 
+      count: 4
+      capitalize_count : 1
+  employee_id : full
+  character: '@'
+  number: 145
+
+ou_department_mapping :
+  type:
+      OU
+  keys:
+    
+    Alyusr Business Management:
+          - Business           

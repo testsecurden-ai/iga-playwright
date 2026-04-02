@@ -1,0 +1,14 @@
+# Exchange Cloud schema configuration
+# Used by ExchangeCloudConnector for user search and attribute mapping
+
+# available fields for search user field : WindowsEmailAddress, Office
+search_user_field:
+    db_field: primary_email
+    search_field: WindowsEmailAddress 
+
+set_user_field: primary_email
+delete_type: soft_delete
+
+# Exchange Cloud specific retry configuration
+max_retry_attempts: 3
+retry_base_delay_seconds: 2

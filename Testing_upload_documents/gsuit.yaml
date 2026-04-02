@@ -1,0 +1,297 @@
+# Google Workspace Connector Configuration File
+
+# Base fields to track for user synchronization
+gws_base_fields:
+  - username
+  - primary_email
+  - display_name
+  - employee_id
+  - first_name
+  - last_name
+  - division
+  - office
+  - work_phone
+  - mobile_phone
+
+# Field mappings between IGA database fields and Google Workspace API fields
+gws_field_mappings:
+  primaryEmail: primary_email
+  name.givenName: first_name
+  name.familyName: last_name
+  name.fullName: display_name
+  externalIds.0.value: employee_id
+  organizations.0.title: job_title_name
+  organizations.0.department: department_name
+  relations.0.value: manager_primary_email
+  phones.0.value: work_phone
+  phones.1.value: mobile_phone
+  orgUnitPath: org_unit_path
+  suspended: account_suspended
+
+# Reverse mapping from IGA fields to Google Workspace fields
+gws_value_mappings:
+  primary_email: primaryEmail
+  first_name: name.givenName
+  last_name: name.familyName
+  display_name: name.fullName
+  employee_id: externalIds.0.value
+  job_title_name: organizations.0.title
+  department_name: organizations.0.department
+  manager_primary_email: relations.0.value
+  work_phone: phones.0.value
+  mobile_phone: phones.1.value
+  org_unit_path: orgUnitPath
+  account_suspended: suspended
+
+# User search configuration
+# Determines how to search for users in Google Workspace
+search_user_field:
+  db_field: primary_email
+  search_field: primaryEmail
+
+# Alternate search field if primary search fails
+alternate_search_field:
+  db_field: employee_id
+  search_field: externalIds.value
+
+# Determines which field to use for username generation
+set_user_field: username
+
+# Custom username generation rules
+custom_username:
+  first_field: "first_name"
+  second_field: "middle_name"  # Optional middle name
+  third_field: "last_name"
+  firstfield_length: 1          # Take first 1 character of first name
+  secondfield_length: 0         # Skip middle name
+  thirdfield_length: -1         # Take full last name (-1 means all)
+  separator: "."                # Separator between name parts (e.g., j.doe)
+  case_type: "lower"            # Case transformation: lower, upper, capitalize, title
+
+# Password generation configuration
+password_mapping:
+  first_name:
+    count: 4
+    capitalize_count: 1         # Capitalize first character
+  employee_id: full             # Use full employee ID
+  character: '@'                # Add special character
+  number: 123                   # Add number suffix
+  # Example result: John1234@123
+
+# Organizational Unit (OU) to Department mapping
+# Maps department names to Google Workspace organizational unit paths
+ou_department_mapping:
+  keys:
+    Engineering:
+      - Engineering
+      - Software Engineering
+      - DevOps
+      - Platform Engineering
+      - QA Engineering
+      - Engineering Management
+
+    Product:
+      - Product Management
+      - Product Design
+      - UX Research
+      - Product Operations
+
+    Sales:
+      - Sales
+      - Sales Operations
+      - Inside Sales
+      - Enterprise Sales
+      - Account Management
+      - Business Development
+
+    Marketing:
+      - Marketing
+      - Digital Marketing
+      - Content Marketing
+      - Product Marketing
+      - Marketing Operations
+      - Brand
+
+    Finance:
+      - Finance
+      - Accounting
+      - Financial Planning
+      - Treasury
+      - Payroll
+      - Tax
+
+    HR:
+      - Human Resources
+      - HR Operations
+      - Talent Acquisition
+      - Learning and Development
+      - Compensation and Benefits
+      - Employee Relations
+
+    IT:
+      - Information Technology
+      - IT Support
+      - Systems Administration
+      - Network Engineering
+      - Security
+      - IT Operations
+
+    Legal:
+      - Compliance
+      - Contracts
+      - Intellectual Property
+
+    Operations:
+      - Business Operations
+      - Facilities
+      - Procurement
+
+    Customer Success:
+      - Customer Success
+      - Customer Support
+      - Customer Experience
+      - Technical Support
+      - Account Management
+
+    Executive:
+      - C-Suite
+      - Executive Office
+      - Board of Directors
+
+# Group mapping configuration for different entitlement types
+group_mappings:
+  # Map internal role/entitlement names to Google Workspace group emails
+  admin_access:
+    group_email: "admins@company.com"
+    description: "Full administrative access"
+  
+  engineering_team:
+    group_email: "engineering@company.com"
+    description: "Engineering team members"
+  
+  all_employees:
+    group_email: "all@company.com"
+    description: "All company employees"
+
+# Email alias configuration
+email_alias_rules:
+  # Generate additional email aliases for users
+  enabled: true
+  patterns:
+    - "{first_name}.{last_name}@{domain}"
+    - "{first_initial}{last_name}@{domain}"
+
+# License assignment configuration
+license_mappings:
+  # Map job roles or departments to Google Workspace license SKUs
+  default_license: "Google-Apps-For-Business"
+  
+  role_based:
+    developer:
+      - "Google-Apps-For-Business"
+      - "Google-Vault"
+    
+    manager:
+      - "Google-Apps-Unlimited"
+      - "Google-Vault"
+    
+    executive:
+      - "Google-Apps-Unlimited"
+      - "Google-Vault"
+      - "Google-Voice-Premier"
+
+# Account provisioning settings
+provisioning_settings:
+  # Automatically add users to these groups upon creation
+  auto_add_groups:
+    - "all@company.com"
+  
+  # Default organizational unit for new users
+  default_ou: "/"
+  
+  # Send welcome email to new users
+  send_welcome_email: true
+  
+  # Require password change on first login
+  change_password_at_next_login: true
+  
+  # Archive user data instead of immediate deletion
+  archive_on_delete: true
+  
+  # Days to wait before permanent deletion (soft delete period)
+  deletion_grace_period_days: 30
+
+# Sync configuration
+sync_settings:
+  # Fields to sync during user updates
+  sync_fields:
+    - name
+    - orgUnitPath
+    - organizations
+    - phones
+    - relations
+    - externalIds
+  
+  # Whether to sync manager information
+  sync_manager: true
+  
+  # Whether to sync organizational unit changes
+  sync_org_unit: true
+
+# Security settings
+security_settings:
+  # Enforce 2-step verification for users
+  enforce_2sv: false
+  
+  # Suspend inactive users after X days
+  suspend_inactive_users_after_days: 90
+  
+  # Allowed OAuth scopes for service account
+  required_scopes:
+    - "https://www.googleapis.com/auth/admin.directory.user"
+    - "https://www.googleapis.com/auth/admin.directory.group"
+    - "https://www.googleapis.com/auth/admin.directory.orgunit"
+    # - "https://www.googleapis.com/auth/admin.directory.user.security"
+    - "https://www.googleapis.com/auth/admin.directory.rolemanagement"
+
+# Attribute validation rules
+validation_rules:
+  email:
+    pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    required: true
+  
+  employee_id:
+    pattern: "^[A-Z0-9]{4,10}$"
+    required: true
+  
+  phone:
+    pattern: "^\\+?[1-9]\\d{1,14}$"
+    required: false
+
+# Error handling and retry configuration
+error_handling:
+  # Maximum retry attempts for failed API calls
+  max_retries: 3
+  
+  # Retry delay in seconds
+  retry_delay_seconds: 5
+  
+  # Exponential backoff multiplier
+  backoff_multiplier: 2
+
+# Logging configuration
+logging:
+  # Log level for connector operations
+  level: "INFO"
+  
+  # Log all API requests
+  log_api_requests: true
+  
+  # Mask sensitive data in logs
+  mask_sensitive_data: true
+  
+  # Fields to mask in logs
+  masked_fields:
+    - password
+    - service_account_json
+    - api_key
