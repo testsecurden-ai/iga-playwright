@@ -10,13 +10,15 @@
   "type": "commonjs",
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@types/node": "^25.0.3"
+    "@types/node": "^25.0.3",
+    "@types/pdfkit": "^0.17.5"
   },
   "directories": {
     "test": "tests"
   },
   "dependencies": {
     "dotenv": "^17.4.0",
+    "pdfkit": "^0.18.0",
     "playwright": "^1.57.0",
     "playwright-core": "^1.57.0",
     "undici-types": "^7.16.0"

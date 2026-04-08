@@ -1,23 +1,232 @@
 import { test, expect, Page } from '@playwright/test';
 import dotenv from 'dotenv';
+import PDFDocument from 'pdfkit';
+import fs from 'fs';
 
-test.setTimeout(10 * 60 * 1000); // 10 minutes
 dotenv.config();
 
-async function runStep(stepName: string, stepFn: () => Promise<void>) {
+test.setTimeout(30 * 60 * 1000); // 30 minutes
+
+let reportSteps: any[] = [];
+
+// Run step function and capture screenshot
+async function runStep(
+  stepName: string,
+  page: Page,
+  stepFn: () => Promise<string | void>
+) {
+  const start = Date.now();
   console.log(`===== ${stepName} STARTED =====`);
+
+  let details = '';
+
   try {
-    await stepFn();
-    console.log(`===== ${stepName} COMPLETED =====`);
+    details = (await stepFn()) || '';   // 👈 capture returned text
+
+    const duration = ((Date.now() - start) / 1000).toFixed(2);
+
+    console.log(`===== ${stepName} COMPLETED (${duration}s) =====`);
+
+    reportSteps.push({
+      name: stepName,
+      status: 'PASSED',
+      time: duration,
+      screenshot: await page.screenshot({ fullPage: true }),
+      details: details      // 👈 store here
+    });
+
   } catch (error) {
-    console.log(`===== ${stepName} FAILED =====`);
-    throw error; // important → keeps test failing
+    const duration = ((Date.now() - start) / 1000).toFixed(2);
+
+    console.log(`===== ${stepName} FAILED (${duration}s) =====`);
+
+    const screenshot = await page.screenshot({ fullPage: true });
+
+    reportSteps.push({
+      name: stepName,
+      status: 'FAILED',
+      time: duration,
+      screenshot,
+      details: details,     // 👈 still print partial details
+      error: String(error)
+    });
+
+    // don't throw
   }
 }
 
+// ================= PDF REPORT =================
+
+function generatePDFReport() {
+
+  const now = new Date();
+
+  const timestamp =
+    now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0') + '_' +
+    String(now.getHours()).padStart(2, '0') + '-' +
+    String(now.getMinutes()).padStart(2, '0') + '-' +
+    String(now.getSeconds()).padStart(2, '0');
+
+  const fileName = `${process.env.RESULT_REPORT_NAME}_${timestamp}.pdf`;
+
+  // create folder if not exists
+  if (!fs.existsSync('reports')) {
+    fs.mkdirSync('reports');
+  }
+
+  const doc = new PDFDocument({ margin: 30 });
+
+  doc.pipe(fs.createWriteStream(`reports/${fileName}`));
+
+  console.log(`Report generated: reports/${fileName}`);
+
+  // ===== TITLE =====
+  doc.font('Times-Bold')
+    .fontSize(18)
+    .text(process.env.REPORT_HEADER_NAME!, { align: 'center' });
+
+  doc.moveDown(2);
+
+  const startX = 50;
+  let y = doc.y;
+
+  // ===== HEADER =====
+  doc.rect(startX - 5, y - 3, 500, 20).fill('#D9E1F2');
+
+  doc.fillColor('black')
+    .font('Times-Bold')
+    .fontSize(12);
+
+  doc.text('S.No', startX, y);
+  doc.text('Test Case Name', startX + 50, y);
+  doc.text('Time (sec)', startX + 350, y);
+  doc.text('Status', startX + 430, y);
+  y += 25;
+  doc.font('Times-Roman').fontSize(11);
+
+  // ===== TABLE ROWS =====
+reportSteps.forEach((step, index) => {
+
+  if (y > 700) {
+    doc.addPage();
+    y = 50;
+  }
+
+  doc.fillColor('black')
+    .text(String(index + 1), startX, y);
+
+  doc.text(step.name, startX + 50, y, {
+    width: 280,
+    align: 'left'
+  });
+
+  doc.text(`${step.time}s`, startX + 350, y, {
+    width: 60,
+    align: 'center'
+  });
+
+  doc.fillColor(step.status === 'PASSED' ? 'green' : 'red')
+    .text(step.status, startX + 430, y, {
+      width: 70,
+      align: 'left'
+    });
+
+  y += 18;
+
+  // ✅ ADD THIS BLOCK (prints provisioning identities)
+  if (step.details) {
+
+    doc.font('Times-Roman')
+      .fontSize(9)
+      .fillColor('black')
+      .text(step.details, startX + 50, y, {
+        width: 430,
+        align: 'left'
+      });
+
+    y = doc.y + 5;
+  }
+
+  y += 5;
+});
+
+  doc.moveDown(2);
+  // ===== SCREENSHOTS HEADER (CENTER + SMALLER SIZE) =====
+
+  doc.font('Times-Bold')
+    .fontSize(16)
+    .fillColor('black')
+    .text('Screenshots', 0, doc.y, {
+      width: doc.page.width,   // 👈 THIS is the key fix
+      align: 'center'
+    });
+
+  doc.moveDown(1.5);
+
+  reportSteps.forEach(step => {
+
+    // 🛑 Ensure enough space for full block
+    if (doc.y + 320 > doc.page.height) {
+      doc.addPage();
+    }
+
+    const lineY = doc.y;
+
+    const statusColor = step.status === 'PASSED' ? 'green' : 'red';
+
+    // Test name
+    doc.font('Times-Bold')
+      .fontSize(11)
+      .fillColor('black')
+      .text(`${step.name} - `, 50, lineY, {
+        continued: true
+      });
+
+    // Status
+    doc.fillColor(statusColor)
+      .text(step.status);
+
+    doc.y = lineY + 20;
+
+    // ✅ ADD THIS BLOCK (prints provisioning result)
+    if (step.details) {
+
+      doc.font('Times-Roman')
+        .fontSize(9)
+        .fillColor('black')
+        .text(step.details, 60, doc.y, {
+          width: 480,
+          align: 'left'
+        });
+
+      doc.moveDown(0.5);
+    }
+
+    // 🛑 Check again before image
+    if (doc.y + 250 > doc.page.height) {
+      doc.addPage();
+    }
+
+    // image center
+    const imgWidth = 400;
+    const pageWidth = doc.page.width;
+    const x = (pageWidth - imgWidth) / 2;
+
+    doc.image(step.screenshot, x, doc.y, {
+      width: imgWidth
+    });
+
+    doc.y += 260;
+    doc.moveDown(1);
+  });
+
+  doc.end();
+}
 
 test('test', async ({ page }) => {
-  await runStep('Volt HRMS Onboarding', async () => {
+  await runStep('Volt HRMS Onboarding', page, async () => {
     await page.goto(process.env.BUILD_URL!);
     await page.getByRole('textbox', { name: 'Username' }).fill(process.env.LOGIN_USERNAME!);
     await page.getByRole('textbox', { name: 'Password' }).fill(process.env.LOGIN_PASSWORD!);
@@ -37,15 +246,18 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     // success validation
     await expect(page.getByText('Identity Source Added')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.VOLT_HRMS_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await page.getByRole('gridcell', { name: process.env.VOLT_HRMS_APPLICATION_NAME!, exact: true }).dblclick();
-  await page.getByRole('link', { name: 'Admin' }).click();
-  await page.getByText('Manage & Govern Identities').click();
-  await page.getByRole('link', { name: 'Applications' }).click();
-
-
-  await runStep('AWS IAM Onboarding', async () => {
+  await runStep('AWS IAM Onboarding', page, async () => {
+    await page.getByRole('link', { name: 'Admin' }).click();
+    await page.getByText('Manage & Govern Identities').click();
+    await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('AWS IAM').click({ force: true });
     await page.locator('#app_name').fill(process.env.AWS_IAM_APPLICATION_NAME!);
@@ -64,9 +276,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.AWS_IAM_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('Entra ID Onboarding', async () => {
+  await runStep('Entra ID Onboarding', page, async () => {
     await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('Entra ID').click();
@@ -88,9 +306,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.ENTRA_ID_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('Exchange Server Onboarding', async () => {
+  await runStep('Exchange Server Onboarding', page, async () => {
     await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('Exchange Server').click();
@@ -119,9 +343,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.EXCHANGE_SERVER_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('AWS Identity Center Onboarding', async () => {
+  await runStep('AWS Identity Center Onboarding', page, async () => {
     await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('AWS Identity Center').click({ force: true });
@@ -138,9 +368,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.AWS_CLOUD_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('Active Directory Onboarding', async () => {
+  await runStep('Active Directory Onboarding', page, async () => {
     await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('Active Directory').click();
@@ -169,9 +405,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.AD_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('Office 365 Onboarding', async () => {
+  await runStep('Office 365 Onboarding', page, async () => {
     await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('Office').click({ force: true });
@@ -188,9 +430,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.OFFICE_365_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('Google Workspace Onboarding', async () => {
+  await runStep('Google Workspace Onboarding', page, async () => {
     await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('Google Workspace').click({ force: true });
@@ -224,9 +472,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.GOOGLE_WORKSPACE_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('Exchange Cloud Onboarding', async () => {
+  await runStep('Exchange Cloud Onboarding', page, async () => {
     await page.getByRole('link', { name: 'Applications' }).click();
     await page.getByRole('button', { name: 'Add Application' }).click();
     await page.getByText('Exchange Cloud').click({ force: true });
@@ -243,13 +497,19 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // success validation
     await expect(page.getByText('Application Added Successfully')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.EXCHANGE_CLOUD_APPLICATION_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
 
   await page.getByRole('link', { name: 'Admin' }).click();
   await page.getByText('Manage & Govern Identities').click();
   await page.getByRole('link', { name: 'Workflows' }).click();
-  await runStep('Approval Workflow', async () => {
+  await runStep('Approval Workflow', page, async () => {
     await page.getByRole('button', { name: 'Add' }).click();
     await page.locator('#name').fill('Approval workflow');
     await page.locator('#name').press('Tab');
@@ -264,9 +524,15 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
     // validation
     await expect(page.getByText('Workflow created successfully.')).toBeVisible();
+    // audit validation
+    await page.locator('#iga-audit-route-link').click();
+    const row = page
+      .locator('#table_container tbody tr')
+      .filter({ hasText: process.env.APPROVAL_WORKFLOW_NAME! });
+    await expect(row.first()).toBeVisible({ timeout: 20000 });
   });
 
-  await runStep('Leaver Workflow', async () => {
+  await runStep('Leaver Workflow', page, async () => {
     await page.getByRole('link', { name: 'Workflows' }).click();
     await page.getByRole('button', { name: 'Add' }).click();
     await page.locator('#name').click();
@@ -287,7 +553,7 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
   });
 
-  await runStep('Reports Customization', async () => {
+  await runStep('Reports Customization', page, async () => {
     await page.getByRole('link', { name: 'Report', exact: true }).click();
     await page.getByText('Newly Onboarded Employees').click();
     await page.getByRole('button', { name: 'Customize Report' }).click();
@@ -304,7 +570,7 @@ test('test', async ({ page }) => {
 
   await page.waitForTimeout(5 * 60 * 1000); // 5mins timeout for entitlement sync
 
-  await runStep('Business Role', async () => {
+  await runStep('Business Role', page, async () => {
     await page.getByRole('link', { name: 'Business Role' }).click();
     await page.getByRole('button', { name: 'Add' }).click();
     await page.locator('#role_name').fill('Developers');
@@ -340,8 +606,50 @@ test('test', async ({ page }) => {
     await page.getByRole('button', { name: 'Save' }).click();
   });
 
-  await runStep('Sync Source', async () => {
+  await runStep('Sync Source', page, async () => {
     await page.getByRole('link', { name: 'Data Sources' }).click();
     await page.locator('.icon-sync').click();
   });
+
+  await page.waitForTimeout(2 * 60 * 1000); // 2mins timeout for provisioning
+
+  // Go to Provisioning tab
+  await runStep('Provisioning', page, async () => {
+
+    await page.getByRole('link', { name: 'Admin' }).click();
+    await page.getByText('Manage & Govern Identities').click();
+    await page.getByRole('link', { name: 'Provisioning' }).click();
+    await page.waitForLoadState('networkidle');
+    await page.getByText('Successfully Provisioned').first().waitFor();
+    const rows = page.locator('tbody tr:visible');
+    const count = await rows.count();
+    console.log(`Provisioning entries found: ${count}`);
+    let provisioned = 0;
+    let others = 0;
+    let details = '\nProvisioning Details:\n\n';
+    for (let i = 0; i < count; i++) {
+      const row = rows.nth(i);
+      const identity = (await row.locator('td').nth(0).textContent())?.trim();
+      const entitlement = (await row.locator('td').nth(3).textContent())?.trim();
+      const status = (await row.locator('td').nth(4).textContent())?.trim();
+      const line = `${i + 1}. ${identity} - ${status} (${entitlement})`;
+      console.log(line);
+      details += line + '\n';
+      if (status?.includes('Successfully')) provisioned++;
+      else others++;
+    }
+
+    details += `\n-----------------------------\n`;
+    details += `Provisioned : ${provisioned}\n`;
+    details += `Others      : ${others}\n`;
+    details += `Total       : ${count}\n`;
+
+    console.log(details);
+    return details;   // IMPORTANT: only here
+  });
+});
+
+// generate PDF after all cases
+test.afterAll(async () => {
+  generatePDFReport();
 });
